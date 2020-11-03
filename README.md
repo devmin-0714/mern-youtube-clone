@@ -224,7 +224,7 @@ function VideoUploadPage() {
       if (response.data.success) {
         console.log(response.data)
       } else {
-        alert('failed to save the video in server')
+        alert('비디오 업로드를 실패했습니다.')
       }
     })
   }
@@ -305,4 +305,120 @@ router.post('/uploadfiles', (req, res) => {
 })
 
 module.exports = router
+```
+
+---
+
+## 3. ffmpeg로 비디오 썸네일 생성하기
+
+- **썸네일 생성을 위한 Dependency를 다운 받기**
+  - `fluent-ffmpeg` 를 다운 받기 위한 필수조건
+  - `brew install ffmpeg`
+    - [설치방법](https://ai-creator.tistory.com/78)
+  - `npm install fluent-ffmpeg --save` (`Server` 경로)
+- **서버에 저장된 비디오를 이용한 썸네일 생성**
+- **생성된 썸네일을 서버에 저장**
+- **썸네일 이미지 파일 경로 정보를 클라이언트에 보내기**
+- **썸네일 이미지를 화면에 표시**
+
+```js
+// VideoUploadPage.js
+function VideoUploadPage() {
+
+    const [FilePath, setFilePath] = useState('')
+    const [Duration, setDuration] = useState('')
+    const [ThumbnailPath, setThumbnailPath] = useState('')
+
+    const onDrop = (files) => {
+        let formData = new FormData();
+        const config = {
+            header: { 'content-type': 'multipart/form-data' }
+        }
+
+        formData.append("file", files[0])
+
+        // 비디오 업로드
+        axios.post('/api/video/uploadfiles', formData, config)
+        .then(response => {
+            if (response.data.success) {
+
+                let variable = {
+                    filePath: response.data.filePath,
+                    fileName: response.data.fileName
+                }
+
+                setFilePath(response.data.filePath)
+
+                // filepath를 이용해 썸네일 만들기
+                axios.post('/api/video/thumbnail', variable)
+                    .then(response => {
+                        if (response.data.success) {
+                            setDuration(response.data.fileDuration)
+                            setThumbnailPath(response.data.thumbsFilePath)
+                        } else {
+                            alert('썸네일 생성에 실패했습니다.');
+                        }
+                    })
+
+            } else {
+                alert('비디오 업로드를 실패했습니다.')
+            }
+        })
+    }
+
+    return (
+
+        {/* Thumbnail */}
+        {ThumbnailPath &&
+            <div>
+                <img src={`http://localhost:5000/${ThumbnailPath}`} alt="thumbnail" />
+            </div>
+        }
+    )
+}
+
+// server/routes/video.js
+var ffmpeg = require('fluent-ffmpeg')
+router.post('/thumbnail', (req, res) => {
+
+    // **썸네일 생성하고 비디오 러닝타임도 가져오기**
+
+    let thumbsFilePath = ''
+    let fileDuration = ''
+
+    // 비디오 러닝타임 가져오기
+    ffmpeg.ffprobe(req.body.filePath, function(err, metadata){
+        console.dir(metadata) // all metadata
+        console.log(metadata.format.duration)
+        fileDuration = metadata.format.duration
+    })
+
+    // 썸네일 생성
+    ffmpeg(req.body.filePath)
+        // 썸네일의 filename을 생성
+        .on('filenames', function (filenames) {
+            console.log('Will generate ' + filenames.join(', '))
+            console.log(filenames)
+            thumbsFilePath = 'uploads/thumbnails/' + filenames[0]
+        })
+        // 썸네일 생성 후 처리
+        .on('end', function () {
+            console.log('Screenshots taken')
+            return res.json({ success: true, thumbsFilePath: thumbsFilePath, fileDuration: fileDuration })
+        })
+        // 에러처리
+        .on('error', function(err) {
+            console.error(err)
+            return res.json({ success: false, err })
+        })
+        // 옵션
+        .screenshots({
+            // Will take screens at 20%, 40%, 60% and 80% of the video
+            count: 3,
+            folder: 'uploads/thumbnails/',
+            size:'320x240',
+            // %b input basename ( filename w/o extension )
+            filename:'thumbnail-%b.png'
+        })
+})
 ```
