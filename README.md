@@ -422,3 +422,123 @@ router.post('/thumbnail', (req, res) => {
         })
 })
 ```
+
+---
+
+## 4. 비디오 업로드 하기
+
+- **비디오 Collection을 만든다**
+
+  - `writer`, `title`, `description`, `privacy`, `filePath`, `category`, `views`, `duration`, `thumbnail`
+
+- **onSubmit Function을 만든다**
+- **요청할 데이터들을 서버로 보낸다**
+- **보낸 데이터들을 MongoDB에 저장한다**
+
+  - `RDBMS/MongoDB` - `Database/Database` - `Tables/Collections` - `Rows/Documents` - `Columns/Fields`
+
+```js
+// server/models/Vidoe.js
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+
+const videoSchema = mongoose.Schema(
+  {
+    writer: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    title: {
+      type: String,
+      maxlength: 50,
+    },
+    description: {
+      type: String,
+    },
+    privacy: {
+      type: Number,
+    },
+    filePath: {
+      type: String,
+    },
+    category: {
+      type: String,
+    },
+    views: {
+      type: Number,
+      default: 0,
+    },
+    duration: {
+      type: String,
+    },
+    thumbnail: {
+      type: String,
+    },
+  },
+  { timestamps: true }
+)
+
+const Video = mongoose.model('Video', videoSchema)
+
+module.exports = { Video }
+
+// VideoUploadPage.js
+import { useSelector } from 'react-redux'
+
+function VideoUploadPage() {
+  // 리덕스의 state 스토어에 가서 user 정보를 선택
+  const user = useSelector((state) => state.user)
+
+  const onSubmit = (e) => {
+    e.preventDefault()
+
+    // Video Collention에 모두 넣기 위해
+    const variables = {
+      // 리덕스의 State에서 확인 가능 (user.userData)
+      // react-redux의 useSelector를 이용
+      writer: user.userData._id,
+      title: VideoTitle,
+      description: Description,
+      privacy: Privacy,
+      filePath: FilePath,
+      category: Category,
+      duration: Duration,
+      thumbnail: ThumbnailPath,
+    }
+
+    axios.post('/api/video/uploadVideo', variables).then((response) => {
+      if (response.data.success) {
+        alert('성공적으로 업로드를 했습니다.')
+        setTimeout(() => {
+          props.history.push('/')
+        }, 3000)
+      } else {
+        alert('비디오 업로드에 실패했습니다.')
+      }
+    })
+  }
+  return (
+    <Form onSubmit={onSubmit}>
+      <Button type="primary" size="large" onClick={onSubmit}>
+        Submit
+      </Button>
+    </Form>
+  )
+}
+
+// server/routes/video.js
+const { Video } = require('../models/Video')
+
+router.post('/uploadVideo', (req, res) => {
+  // 비디오 정보를 mongoDB에 저장한다
+
+  const video = new Video(req.body)
+
+  video.save((err, doc) => {
+    if (err) return res.status(400).json({ success: false, err })
+    return res.status(200).json({
+      success: true,
+    })
+  })
+})
+```

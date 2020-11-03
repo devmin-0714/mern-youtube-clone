@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Typography, Form, Input, Button, Icon} from 'antd'
 import Dropzone from 'react-dropzone'
 import axios from 'axios'
+import { useSelector } from 'react-redux'
 
 const { Title } = Typography
 const { TextArea } = Input
@@ -19,8 +20,10 @@ const CatogoryOptions = [
     { value: 4, label: 'Sports' }
 ]
 
-function VideoUploadPage() {
+function VideoUploadPage(props) {
 
+    // 리덕스의 state 스토어에 가서 user 정보를 선택
+    const user = useSelector(state => state.user)
     const [VideoTitle, setVideoTitle] = useState('')
     const [Description, setDescription] = useState('')
     const [Privacy, setPrivacy] = useState(0)
@@ -82,13 +85,45 @@ function VideoUploadPage() {
         })
     }
 
+    const onSubmit = (e) => {
+
+        e.preventDefault()
+
+        // Video Collention에 모두 넣기 위해
+        const variables = {
+            // 리덕스의 State에서 확인 가능 (user.userData)
+            // react-redux의 useSelector를 이용
+            writer: user.userData._id,
+            title: VideoTitle,
+            description: Description,
+            privacy: Privacy,
+            filePath: FilePath,
+            category: Category,
+            duration: Duration,
+            thumbnail: ThumbnailPath
+        }
+
+        axios.post('/api/video/uploadVideo', variables)
+            .then(response => {
+                if (response.data.success) {
+                    alert('성공적으로 업로드를 했습니다.')
+                    setTimeout(() => {
+                        props.history.push('/')
+                    }, 3000)
+                } else {
+                    alert('비디오 업로드에 실패했습니다.')
+                }
+            })
+
+    }
+
     return (
         <div style={{ maxWidth: '700px', margin: '2rem auto' }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                 <Title level={2} > Upload Video</Title>
             </div>
 
-            <Form onSubmit>
+            <Form onSubmit={onSubmit}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     
                     {/* Drop Zone */}
@@ -155,7 +190,7 @@ function VideoUploadPage() {
                 <br />
                 <br />
 
-                <Button type="primary" size="large" onClick>
+                <Button type="primary" size="large" onClick={onSubmit}>
                     Submit
                 </Button>
 
