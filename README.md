@@ -193,3 +193,116 @@ function VideoUploadPage() {
 
 export default VideoUploadPage
 ```
+
+---
+
+## 2. Multer로 노드 서버에 비디오 저장하기
+
+- **onDrop func 만들기**
+- **노드 서버에 파일을 저장하기 위해 Dependency를 먼저 다운로드**
+  - `npm install multer --save` (`Server` 경로)
+  - [multer](https://www.npmjs.com/package/multer)
+- **비디오 파일을 서버로 보내기**
+- **받은 비디오 파일을 서버에서 저장**
+- **파일 저장 경로를 클라이언트로 전달해 주기**
+
+```js
+// VideoUploadPage.js
+import Dropzone from 'react-dropzone'
+import axios from 'axios'
+
+function VideoUploadPage() {
+  const onDrop = (files) => {
+    let formData = new FormData()
+    const config = {
+      header: { 'content-type': 'multipart/form-data' },
+    }
+
+    formData.append('file', files[0])
+
+    axios.post('/api/video/uploadfiles', formData, config).then((response) => {
+      if (response.data.success) {
+        console.log(response.data)
+      } else {
+        alert('failed to save the video in server')
+      }
+    })
+  }
+
+  return (
+    <Form onSubmit>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        {/* Drop Zone */}
+        <Dropzone onDrop={onDrop} multiple={false} maxSize={800000000}>
+          {({ getRootProps, getInputProps }) => (
+            <div
+              style={{
+                width: '300px',
+                height: '240px',
+                border: '1px solid lightgray',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              {...getRootProps()}
+            >
+              <input {...getInputProps()} />
+              <Icon type="plus" style={{ fontSize: '3rem' }} />
+            </div>
+          )}
+        </Dropzone>
+      </div>
+    </Form>
+  )
+}
+
+// server/index.js
+app.use('/api/video', require('./routes/video'))
+
+// server/routes/video.js
+const express = require('express')
+const router = express.Router()
+const multer = require('multer')
+
+const { auth } = require('../middleware/auth')
+
+var storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/')
+  },
+
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}_${file.originalname}`)
+  },
+
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname)
+    if (ext !== '.mp4') {
+      return cb(res.status(400).end('only jpg, png, mp4 is allowed'), false)
+    }
+    cb(null, true)
+  },
+})
+
+var upload = multer({ storage: storage }).single('file')
+
+//=================================
+//             Video
+//=================================
+
+router.post('/uploadfiles', (req, res) => {
+  // 비디오를 서버에 저장한다.
+  upload(req, res, (err) => {
+    if (err) {
+      return res.json({ success: false, err })
+    }
+    return res.json({
+      success: true,
+      filePath: res.req.file.path,
+      fileName: res.req.file.filename,
+    })
+  })
+})
+
+module.exports = router
+```
