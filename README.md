@@ -670,3 +670,90 @@ router.get('/getVideos', (req, res) => {
   line-height: 12px;
 }
 ```
+
+## 6. 비디오 디테일 페이지 만들기
+
+- **비어있는 비디오 디테일 페이지 생성**
+- **비디오 디테일 페이지를 위한 Route 만들기**
+- **비디오 디테일 페이지 Template 만들기**
+- **MongoDB에서 비디오 데이터 가져오기**
+- **가져온 데이터들을 스크린에 출력한다**
+
+```js
+// App.js
+import VideoDetailPage from './views/VideoDetailPage/VideoDetailPage'
+function App() {
+  return (
+    <Switch>
+      <Route
+        exact
+        path="/video/:videoId"
+        component={Auth(VideoDetailPage, null)}
+      />
+    </Switch>
+  )
+}
+
+// VideoDetailPage.js
+import React, { useEffect, useState } from 'react'
+import { List, Avatar, Row, Col } from 'antd'
+import axios from 'axios'
+
+function VideoDetailPage(props) {
+  const videoId = props.match.params.videoId
+  const variable = { videoId: videoId }
+
+  const [VideoDetail, setVideoDetail] = useState([])
+
+  useEffect(() => {
+    axios.post('/api/video/getVideoDetail', variable).then((response) => {
+      if (response.data.success) {
+        setVideoDetail(response.data.videoDetail)
+      } else {
+        alert('비디오 정보를 가져오길 실패했습니다.')
+      }
+    })
+  }, [])
+
+  if (VideoDetail.writer) {
+    return (
+      <Row gutter={[16, 16]}>
+        <Col lg={18} xs={24}>
+          <div style={{ width: '100%', padding: '3rem 4em' }}>
+            <video
+              style={{ width: '100%' }}
+              src={`http://localhost:5000/${VideoDetail.filePath}`}
+              controls
+            ></video>
+            <List.Item actions>
+              <List.Item.Meta
+                avatar={<Avatar src={VideoDetail.writer.image} />}
+                title={VideoDetail.writer.name}
+                description={VideoDetail.description}
+              />
+            </List.Item>
+          </div>
+        </Col>
+
+        <Col lg={6} xs={24}></Col>
+      </Row>
+    )
+  } else {
+    return <div>...loading</div>
+  }
+}
+
+export default VideoDetailPage
+
+// server/routes/video.js
+router.post('/getVideoDetail', (req, res) => {
+  Video.findOne({ _id: req.body.videoId })
+    .populate('writer')
+    .exec((err, videoDetail) => {
+      if (err) return res.status(400).send(err)
+      res.status(200).json({ success: true, videoDetail })
+    })
+})
+```
+
+---
