@@ -485,7 +485,7 @@ module.exports = { Video }
 // VideoUploadPage.js
 import { useSelector } from 'react-redux'
 
-function VideoUploadPage() {
+function VideoUploadPage(props) {
   // 리덕스의 state 스토어에 가서 user 정보를 선택
   const user = useSelector((state) => state.user)
 
@@ -541,4 +541,132 @@ router.post('/uploadVideo', (req, res) => {
     })
   })
 })
+```
+
+---
+
+## 5. 랜딩 페이지에 비디오들 나타나게 하기
+
+- **빈 랜딩 페이지 생성**
+- **비디오 카드 Template 만들기**
+- **몽고 DB에서 모든 비디오 데이터 가져오기**
+  - `useEffect` : `DOM`이 로드 되자마자 무엇을 할것인지
+
+```js
+// server/models/Video.js
+writer: {
+type: Schema.Types.ObjectId,
+ref: 'User'
+}
+
+// LandingPage.js
+Video.find().populate('writer')
+```
+
+- **가져온 비디오 데이터들을 스크린에 출력하기**
+  - `Use map() methods`
+
+```js
+// LandingPage.js
+import React, { useEffect, useState } from 'react'
+import axios from 'axios'
+import moment from 'moment'
+import { Card, Avatar, Col, Typography, Row } from 'antd'
+
+const { Title } = Typography
+const { Meta } = Card
+
+function LandingPage() {
+
+    const [Video, setVideo] = useState([])
+
+    useEffect(() => {
+        axios.get('/api/video/getVideos')
+            .then(response => {
+                if (response.data.success) {
+                    setVideo(response.data.videos)
+                } else {
+                    alert('비디오를 가져오는데 실패했습니다.')
+                }
+            })
+    }, [])
+
+    const renderCards = Video.map((video, index) => {
+
+        var minutes = Math.floor(video.duration / 60);
+        var seconds = Math.floor(video.duration - minutes * 60);
+
+        return <Col key={index} lg={6} md={8} xs={24}>
+            <a href={`/video/${video._id}`} >
+                <div style={{ position: 'relative' }}>
+                    <img style={{ width: '100%' }} src={`http://localhost:5000/${video.thumbnail}`} />
+                    <div className="duration">
+                      <span>{minutes} : {seconds}</span>
+                    </div>
+                </div>
+            </a>
+            <br />
+            <Meta
+                avatar={
+                    <Avatar src={video.writer.image} />
+                }
+                title={video.title}
+                description
+            />
+            <span>{video.writer.name} </span><br />
+            <span style={{ marginLeft: '3rem' }}> {video.views} views</span>
+            - <span> {moment(video.createdAt).format("MMM Do YY")} </span>
+        </Col>
+
+    })
+
+    return (
+        <div style={{ width: '85%', margin: '3rem auto' }}>
+            <Title level={2} > Recommended </Title>
+            <hr />
+
+            <Row gutter={[32, 16]}>
+                {renderCards}
+            </Row>
+        </div>
+    )
+}
+
+export default LandingPage
+
+
+// server/routes/video.js
+router.get('/getVideos', (req, res) => {
+  // 비디오를 DB에서 가져와서 클라이언트에 보낸다.
+
+  Video.find()
+    /* server/models/Video.js
+        writer: {
+        type: Schema.Types.ObjectId,
+        ref: 'User'
+        } */
+    .populate('writer')
+    .exec((err, videos) => {
+      if (err) return res.status(400).send(err)
+      res.status(200).json({ success: true, videos })
+    })
+})
+
+// client/src/index.css
+// 비디오 시간 CSS
+.duration {
+  bottom: 0;
+  right: 0;
+  position: absolute;
+  margin: 4px;
+  color: #fff;
+  background-color: rgba(17, 17, 17, 0.8);
+  opacity: 0.8;
+  padding: 2px 4px;
+  border-radius: 2px;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 12px;
+}
 ```
