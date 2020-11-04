@@ -4,6 +4,7 @@ const multer = require('multer')
 var ffmpeg = require('fluent-ffmpeg')
 
 const { Video } = require('../models/Video')
+const { Subscriber } = require('../models/Subscriber')
 const { auth } = require('../middleware/auth')
 
 var storage = multer.diskStorage({
@@ -118,7 +119,7 @@ router.get('/getVideos', (req, res) => {
         .populate('writer')
         .exec((err, videos) => {
             if(err) return res.status(400).send(err)
-            res.status(200).json({ success: true, videos })
+            return res.status(200).json({ success: true, videos })
         })
 
 })
@@ -129,8 +130,35 @@ router.post('/getVideoDetail', (req, res) => {
         .populate('writer')
         .exec((err, videoDetail) => {
             if(err) return res.status(400).send(err)
-            res.status(200).json({ success: true, videoDetail })
+            return res.status(200).json({ success: true, videoDetail })
     })
 })
+
+router.post('/getSubscriptionVideos', (req, res) => {
+
+    // 1. 자신의 아이디를 가지고 Subscriber Collectionp에서 구독한 사람들을 찾는다.
+    Subscriber.find({ 'userFrom': req.body.userFrom })
+    .exec(( err, subscriberInfo )=> {
+        if(err) return res.status(400).send(err)
+
+        // userTo의 정보를 모두 넣어준다.
+        let subscribedUser = []
+
+        subscriberInfo.map((subscriber, i)=> {
+            subscribedUser.push(subscriber.userTo)
+        })
+
+        // 2. 찾은 사람들의 비디오를 가지고 온다. 
+        // 정보가 2개 이상일 때는 { writer : req.body.id } 가 사용되지 못한다.
+        Video.find({ writer: { $in: subscribedUser }})
+            .populate('writer')
+            .exec((err, videos) => {
+                if(err) return res.status(400).send(err)
+                return res.status(200).json({ success: true, videos })
+            })
+    })
+})
+
+
 
 module.exports = router

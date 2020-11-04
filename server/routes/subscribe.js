@@ -16,7 +16,7 @@ router.post('/subscribeNumber', (req, res) => {
     Subscriber.find({ 'userTo': req.body.userTo })
     .exec((err, subscribe) => {
         if(err) return res.status(400).send(err)
-        res.status(200).json({ success: true, subscribeNumber: subscribe.length  })
+        return res.status(200).json({ success: true, subscribeNumber: subscribe.length  })
     })
 
 })
@@ -32,7 +32,7 @@ router.post('/subscribed', (req, res) => {
             result = true
         }
 
-        res.status(200).json({ success: true, subcribed: result })
+        return res.status(200).json({ success: true, subcribed: result })
     })
 
 })
@@ -42,7 +42,7 @@ router.post('/unSubscribe', (req, res) => {
     Subscriber.findOneAndDelete({ userTo: req.body.userTo, userFrom: req.body.userFrom })
         .exec((err, doc)=>{
             if(err) return res.status(400).json({ success: false, err })
-            res.status(200).json({ success: true, doc })
+            return res.status(200).json({ success: true, doc })
         })
 })
 
@@ -52,7 +52,7 @@ router.post('/subscribe', (req, res) => {
 
     subscribe.save((err, doc) => {
         if(err) return res.json({ success: false, err })
-        res.status(200).json({ success: true })
+        return res.status(200).json({ success: true })
     })
 
 })

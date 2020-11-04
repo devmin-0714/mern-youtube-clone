@@ -988,7 +988,7 @@ module.exports = router
       <List.Item
         actions={[<Subscribe
           userTo={VideoDetail.writer._id}
-          useFrom={localStorage.getItem('useId')} />]}
+          userFrom={localStorage.getItem('useId')} />]}
         >
       </List.Item>
     )
@@ -1060,3 +1060,125 @@ router.post('/subscribe', (req, res) => {
 ```
 
 ---
+
+## 9. 구독 비디오 페이지
+
+- **빈 Subscription 페이지 생성**
+- **Subscription 페이지를 위한 Route 만들기**
+- **Template 만들기**
+- **내가 구독한 유저의 비디오들만 서버에서 가져오기**
+- **가져온 비디오 데이터들을 화면에 출력하기**
+
+```js
+// App.js
+import SubscriptionPage from './views/SubscriptionPage/SubscriptionPage'
+
+;<Switch>
+  <Route exact path="/subscription" component={Auth(SubscriptionPage, null)} />
+</Switch>
+
+// NavBar/Sections/LeftMenu.js
+<Menu.Item key="subscription">
+      <a href="/subscription">Subscription</a>
+    </Menu.Item>
+
+// SubscriptionPage.js
+import React, { useEffect, useState } from 'react'
+import { Card, Avatar, Col, Typography, Row } from 'antd'
+import axios from 'axios'
+import moment from 'moment'
+
+const { Title } = Typography
+const { Meta } = Card
+
+function SubscriptionPage() {
+
+    const [Videos, setVideos] = useState([])
+
+    useEffect(() => {
+
+        const subscriptionVariables = {
+            userFrom: localStorage.getItem('userId')
+        }
+
+        axios.post('/api/video/getSubscriptionVideos', subscriptionVariables)
+            .then(response => {
+                if (response.data.success) {
+                    setVideos(response.data.videos)
+                } else {
+                    alert('구독한 비디오를 가져오는데 실패했습니다.')
+                }
+            })
+    }, [])
+
+
+    const renderCards = Videos.map((video, index) => {
+
+        var minutes = Math.floor(video.duration / 60);
+        var seconds = Math.floor(video.duration - minutes * 60);
+
+        return <Col key={index} lg={6} md={8} xs={24}>
+            <a href={`/video/${video._id}`} >
+                <div style={{ position: 'relative' }}>
+                    <img style={{ width: '100%' }} src={`http://localhost:5000/${video.thumbnail}`} />
+                    <div className="duration">
+                      <span>{minutes} : {seconds}</span>
+                    </div>
+                </div>
+            </a>
+            <br />
+            <Meta
+                avatar={
+                    <Avatar src={video.writer.image} />
+                }
+                title={video.title}
+                description
+            />
+            <span>{video.writer.name} </span><br />
+            <span style={{ marginLeft: '3rem' }}> {video.views} views</span>
+            - <span> {moment(video.createdAt).format("MMM Do YY")} </span>
+        </Col>
+
+    })
+
+    return (
+        <div style={{ width: '85%', margin: '3rem auto' }}>
+            <Title level={2} > Recommended </Title>
+            <hr />
+
+            <Row gutter={[32, 16]}>
+                {renderCards}
+            </Row>
+        </div>
+    )
+}
+
+export default SubscriptionPage
+
+// server/routes/video.js
+const { Subscriber } = require('../models/Subscriber')
+router.post('/getSubscriptionVideos', (req, res) => {
+
+    // 1. 자신의 아이디를 가지고 Subscriber Collectionp에서 구독한 사람들을 찾는다.
+    Subscriber.find({ 'userFrom': req.body.userFrom })
+    .exec(( err, subscriberInfo )=> {
+        if(err) return res.status(400).send(err)
+
+        // userTo의 정보를 모두 넣어준다.
+        let subscribedUser = []
+
+        subscriberInfo.map((subscriber, i)=> {
+            subscribedUser.push(subscriber.userTo)
+        })
+
+        // 2. 찾은 사람들의 비디오를 가지고 온다.
+        // 정보가 2개 이상일 때는 { writer : req.body.id } 가 사용되지 못한다.
+        Video.find({ writer: { $in: subscribedUser }})
+            .populate('writer')
+            .exec((err, videos) => {
+                if(err) return res.status(400).send(err)
+                return res.status(200).json({ success: true, videos })
+            })
+    })
+})
+```
