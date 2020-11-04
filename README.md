@@ -769,15 +769,13 @@ router.post('/getVideoDetail', (req, res) => {
 
 ```js
 // VideoDetailPage.js
-if (VideoDetail.writer) {
+import SideVideo from './Sections/SideVideo'
+
     return (
       <Col lg={6} xs={24}>
         <SideVideo />
       </Col>
     )
-  } else {
-    ...
-  }
 }
 
 // VideoDetailPage/Sections/SideVideo.js
@@ -836,6 +834,229 @@ function SideVideo() {
 }
 
 export default SideVideo
+```
+
+---
+
+## 8. 구독 기능
+
+- **Subscriber Model 만들기**
+  - `userTo`, `userFrom`
+- **Subscribe Button UI 만들기**
+- **데이터베이스에서 얼마나 많은 사람이 비디오 업로드 한 유저를 구독하는지 정보 가져오기**
+- **내가 이 비디오 업로드 한 유저를 구독하는지 정보 가져오기**
+- **가져온 정보를 화면에 출력**
+
+```js
+// server/models/Subscriber.js
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+
+const subscriberSchema = mongoose.Schema({
+    userTo: {
+        type: Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    userFrom : {
+        type: Schema.Types.ObjectId,
+        ref: 'User'
+    }
+
+}, { timestamps: true })
+
+const Subscriber = mongoose.model('Subscriber', subscriberSchema)
+
+module.exports = { Subscriber }
+
+// VideoDetailPage.js
+import Subscribe from './Sections/Subscribe'
+
+    return (
+      <List.Item
+          actions={[<Subscribe userTo={VideoDetail.writer._id} />]} >
+      </List.Item>
+    )
+}
+
+// VideoDetailPage/Sections/Subscriber.js
+import React, { useEffect, useState } from 'react'
+import axios from 'axios'
+
+function Subscriber(props) {
+
+    const [SubscribeNumber, setSubscribeNumber] = useState(0)
+    const [Subscribed, setSubscribed] = useState(false)
+
+    useEffect(() => {
+
+        // userTo : VideoDetailPage.js의 userTo={VideoDetail.writer._id}
+        const variable = { userTo: props.userTo }
+
+        axios.post('/api/subscribe/subscribeNumber', variable)
+            .then(response => {
+                if (response.data.success) {
+                    setSubscribeNumber(response.data.subscribeNumber)
+                } else {
+                    alert('구독자 수 정보를 가져오지 못했습니다.')
+                }
+            })
+
+        // userFrom : 개발자도구 - Application - Local Storage - userId
+        let subscribedVariable = { userTo: props.userTo, userFrom: localStorage.getItem('userId')}
+
+        axios.post('/api/subscribe/subscribed', subscribedVariable)
+        .then(response => {
+            if (response.data.success) {
+                setSubscribed(response.data.subcribed)
+            } else {
+                alert('구독 정보를 가져오지 못했습니다.')
+            }
+        })
+
+    }, [])
+
+    return (
+        <div>
+            <button
+                style={{
+                    backgroundColor: `${Subscribed ? '#AAAAAA' : '#CC0000'}`, borderRadius: '4px',
+                    color: 'white', padding: '10px 16px', fontWeight: '500',
+                    fontSize: '1rem', textTransform: 'uppercase'
+                }}
+                onClick
+            >
+                {SubscribeNumber} {Subscribed ? 'Subscribed' : 'Subscribe'}
+            </button>
+        </div>
+    )
+}
+
+export default Subscriber
+
+// server/index.js
+app.use('/api/subscribe', require('./routes/subscribe'))
+
+// server/routes/subscribe.js
+const express = require('express');
+const router = express.Router();
+
+
+const { Subscriber } = require('../models/Subscriber')
+
+const { auth } = require("../middleware/auth")
+
+//=================================
+//             Subscribe
+//=================================
+
+
+router.post('/subscribeNumber', (req, res) => {
+
+    Subscriber.find({ 'userTo': req.body.userTo })
+    .exec((err, subscribe) => {
+        if(err) return res.status(400).send(err)
+        return res.status(200).json({ success: true, subscribeNumber: subscribe.length  })
+    })
+
+})
+
+router.post('/subscribed', (req, res) => {
+
+    Subscriber.find({ 'userTo': req.body.userTo , 'userFrom': req.body.userFrom })
+    .exec((err, subscribe) => {
+        if(err) return res.status(400).send(err)
+
+        let result = false;
+        if(subscribe.length !== 0) {
+            result = true
+        }
+
+        res.status(200).json({ success: true, subcribed: result })
+    })
+
+})
+
+module.exports = router
+```
+
+- **구독하기 기능 만들기**
+- **구독 취소하기 기능 만들기**
+
+```js
+// VideoDetailPage
+    return (
+      <List.Item
+        actions={[<Subscribe
+          userTo={VideoDetail.writer._id}
+          useFrom={localStorage.getItem('useId')} />]}
+        >
+      </List.Item>
+    )
+}
+
+// VideoDetailPage/Sections/Subscriber.js
+function Subscriber(props) {
+
+  const onSubscribe = ( ) => {
+
+        let subscribeVariables = {
+                userTo : props.userTo,
+                userFrom : props.userFrom
+        }
+
+        // 이미 구독 중이라면
+        if(Subscribed) {
+
+            axios.post('/api/subscribe/unSubscribe', subscribeVariables)
+                .then(response => {
+                    if(response.data.success){
+                        setSubscribeNumber(SubscribeNumber - 1)
+                        setSubscribed(!Subscribed)
+                    } else {
+                        alert('구독을 취소하는데 실패했습니다.')
+                    }
+                })
+
+        // 구독중이지 않다면
+        } else {
+
+            axios.post('/api/subscribe/subscribe', subscribeVariables)
+                .then(response => {
+                    if(response.data.success) {
+                        setSubscribeNumber(SubscribeNumber + 1)
+                        setSubscribed(!Subscribed)
+                    } else {
+                        alert('구독하는데 실패했습니다.')
+                    }
+                })
+        }
+
+    }
+  return (
+    <button
+        onClick={onSubscribe} >
+    </button>
+
+// server/routes/subscribe.js
+router.post('/unSubscribe', (req, res) => {
+
+    Subscriber.findOneAndDelete({ userTo: req.body.userTo, userFrom: req.body.userFrom })
+        .exec((err, doc)=>{
+            if(err) return res.status(400).json({ success: false, err })
+            res.status(200).json({ success: true, doc })
+        })
+})
+
+router.post('/subscribe', (req, res) => {
+
+    const subscribe = new Subscriber(req.body)
+
+    subscribe.save((err, doc) => {
+        if(err) return res.json({ success: false, err })
+        res.status(200).json({ success: true })
+    })
+
+})
 ```
 
 ---
