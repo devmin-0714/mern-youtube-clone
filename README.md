@@ -1646,3 +1646,408 @@ function SingleComment(props) {
 
     }
 ```
+
+## 11. 좋아요 싫어요 기능
+
+### 11-1. System Explained
+
+- **Like & DisLike Model 만들기**
+  - `Like` : `userId`, `commentId`, `videoId`
+  - `DisLike` : `userId`,
+- **구조 설명**
+
+```js
+// server/models/Like.js
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+
+const likeSchema = mongoose.Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    commentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Comment',
+    },
+    videoId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Video',
+    },
+  },
+  { timestamps: true }
+)
+
+const Like = mongoose.model('Like', likeSchema)
+
+module.exports = { Like }
+
+// server/models/DisLike.js
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+
+const dislikeSchema = mongoose.Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    commentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Comment',
+    },
+    videoId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Video',
+    },
+  },
+  { timestamps: true }
+)
+
+const Dislike = mongoose.model('Dislike', dislikeSchema)
+
+module.exports = { Dislike }
+```
+
+### 11-2. Template, Fetch Data
+
+- **AntD를 이용하여 Like & DisLike 버튼 만들기**
+- **현재 좋아요 싫어요에 대한 정보를 DB에서 가져오기**
+  - (Request 보낼때 변수는 Video에 것과 Comment에 것이 달라야 한다.)
+  - 좋아요 싫어요 숫자
+  - 내가 좋아요나 싫어요 둘중 하나를 이미 눌렀는지
+
+### 11-3. Function
+
+- **onLike func 만들기**
+- **onDisLike func 만들기**
+
+```js
+// VideoDetailPage.js
+import LikeDislikes from './Sections/LikeDislikes'
+
+function VideoDetailPage(props) {
+  return (
+    <List.Item
+      actions={[
+        <LikeDislikes
+          vdieo
+          userId={localStorage.getItem('userId')}
+          videoId={videoId}
+        />,
+        subscribeButton,
+      ]}
+    ></List.Item>
+  )
+}
+
+// VideoDetailPage/Sections/SingleComment.js
+import LikeDislikes from './LikeDislikes'
+
+  function SingleComment(props) {
+  const actions = [
+        <LikeDislikes
+        userId={localStorage.getItem('userId')}
+        commentId={props.comment._id}/>
+        ,<span onClick={onClickReplyOpen} key="comment-basic-reply-to"> Reply to </span>
+    ]
+  return (
+
+  )
+}
+
+// VideoDetailPage/Sections/LikeDislike.js
+import React, { useEffect, useState } from 'react'
+import { Tooltip, Icon } from 'antd'
+import axios from 'axios'
+
+function LikeDislikes(props) {
+
+    const [Likes, setLikes] = useState(0)
+    const [Dislikes, setDislikes] = useState(0)
+    const [LikeAction, setLikeAction] = useState(null)
+    const [DislikeAction, setDislikeAction] = useState(null)
+
+    let variable = {}
+
+    if (props.video) {
+        variable = { videoId: props.videoId, userId: props.userId }
+    } else {
+        variable = { commentId: props.commentId, userId: props.userId }
+    }
+
+    useEffect(() => {
+
+        axios.post('/api/like/getLikes', variable)
+            .then(response => {
+                if (response.data.success) {
+
+                    // 얼마나 많은 좋아요를 받았는지
+                    setLikes(response.data.likes.length)
+
+                    // 내가 이미 그 좋아요를 눌렀는지
+                    response.data.likes.map(like => {
+                        if (like.userId === props.userId) {
+                            setLikeAction('liked')
+                        }
+                    })
+                } else {
+                    alert('Likes 정보를 가져오는데 실패했습니다.')
+                }
+            })
+
+        axios.post('/api/like/getDislikes', variable)
+            .then(response => {
+                if (response.data.success) {
+
+                    // 얼마나 많은 싫어요를 받았는지
+                    setDislikes(response.data.dislikes.length)
+
+                    // 내가 이미 그 싫어요를 눌렀는지
+                    response.data.dislikes.map(dislike => {
+                        if (dislike.userId === props.userId) {
+                            setDislikeAction('disliked')
+                        }
+                    })
+                } else {
+                    alert('DisLikes 정보를 가져오는데 실패했습니다')
+                }
+            })
+
+    }, [])
+
+    const onLike = () => {
+
+        // Like이 클릭이 되어있지 않았을 때
+        if (LikeAction === null) {
+
+            axios.post('/api/like/upLike', variable)
+                .then(response => {
+                    if (response.data.success) {
+
+                        setLikes(Likes + 1)
+                        setLikeAction('liked')
+
+                        // 만약 dislike가 이미 클릭되어 있으면
+                        if (DislikeAction !== null) {
+                            setDislikeAction(null)
+                            setDislikes(Dislikes - 1)
+                        }
+
+                    } else {
+                        alert('Like를 올리지 못하였습니다.')
+                    }
+                })
+
+        } else {
+
+            // Like이 클릭이 되어있을 때
+            axios.post('/api/like/unLike', variable)
+                .then(response => {
+                    if (response.data.success) {
+
+                        setLikes(Likes - 1)
+                        setLikeAction(null)
+
+                    } else {
+                        alert('Like를 내리지 못하였습니다.')
+                    }
+                })
+        }
+
+    }
+
+    const onDisLike = () => {
+
+        // Disklike가 클릭이 되어있을 때
+        if (DislikeAction !== null) {
+
+            axios.post('/api/like/unDisLike', variable)
+                .then(response => {
+                    if (response.data.success) {
+
+                        setDislikes(Dislikes - 1)
+                        setDislikeAction(null)
+
+                    } else {
+                        alert('Dislike를 내리는데 실패했습니다.')
+                    }
+                })
+
+        // Dislike가 클릭되어 있지 않을때
+        } else {
+
+            axios.post('/api/like/upDisLike', variable)
+                .then(response => {
+                    if (response.data.success) {
+
+                        setDislikes(Dislikes + 1)
+                        setDislikeAction('disliked')
+
+                        // 만약 dislike가 이미 클릭되어 있으면
+                        if(LikeAction !== null ) {
+                            setLikeAction(null)
+                            setLikes(Likes - 1)
+                        }
+
+                    } else {
+                        alert('Dislike를 올리는데 실패했습니다.')
+                    }
+                })
+        }
+    }
+
+    return (
+        <React.Fragment>
+            <span key="comment-basic-like">
+                <Tooltip title="Like">
+                    <Icon type="like"
+                        theme={LikeAction === 'liked' ? 'filled' : 'outlined'}
+                        onClick={onLike} />
+                </Tooltip>
+                <span style={{ paddingLeft: '8px', cursor: 'auto' }}>{Likes}</span>
+            </span>
+            &nbsp;&nbsp;
+            <span key="comment-basic-dislike">
+                <Tooltip title="Dislike">
+                    <Icon
+                        type="dislike"
+                        theme={DislikeAction === 'disliked' ? 'filled' : 'outlined'}
+                        onClick={onDisLike}
+                    />
+                </Tooltip>
+                <span style={{ paddingLeft: '8px', cursor: 'auto' }}>{Dislikes}</span>
+            </span>
+        </React.Fragment>
+    )
+}
+
+export default LikeDislikes
+
+// server/index.js
+app.use('/api/like', require('./routes/like'))
+
+// server/routes/like.js
+const express = require('express')
+const router = express.Router()
+
+const { Like } = require('../models/Like')
+const { Dislike } = require('../models/Dislike')
+
+//=================================
+//             Likes DisLikes
+//=================================
+
+router.post('/getLikes', (req, res) => {
+
+    let variable = {}
+    if (req.body.videoId) {
+        variable = { videoId: req.body.videoId }
+    } else {
+        variable = { commentId: req.body.commentId }
+    }
+
+    Like.find(variable)
+        .exec((err, likes) => {
+            if (err) return res.status(400).send(err)
+            res.status(200).json({ success: true, likes })
+        })
+})
+
+router.post('/getDislikes', (req, res) => {
+
+    let variable = {}
+    if (req.body.videoId) {
+        variable = { videoId: req.body.videoId }
+    } else {
+        variable = { commentId: req.body.commentId }
+    }
+
+    Dislike.find(variable)
+        .exec((err, dislikes) => {
+            if (err) return res.status(400).send(err)
+            res.status(200).json({ success: true, dislikes })
+        })
+})
+
+router.post('/upLike', (req, res) => {
+
+    let variable = {}
+    if (req.body.videoId) {
+        variable = { videoId: req.body.videoId, userId: req.body.userId }
+    } else {
+        variable = { commentId: req.body.commentId , userId: req.body.userId }
+    }
+
+    // Like Collection에 클릭 정보를 넣어준다.
+    const like = new Like(variable)
+    like.save((err, likeResult) => {
+        if (err) return res.json({ success: false, err })
+
+        // 만약 Dislike이 이미 클릭이 되어 있다면, Dislike를 1 줄여준다
+        Dislike.findOneAndDelete(variable)
+            .exec((err, disLikeResult) => {
+                if (err) return res.status(400).json({ success: false, err })
+                res.status(200).json({ success: true })
+            })
+    })
+})
+
+router.post('/unLike', (req, res) => {
+
+    let variable = {}
+    if (req.body.videoId) {
+        variable = { videoId: req.body.videoId, userId: req.body.userId }
+    } else {
+        variable = { commentId: req.body.commentId , userId: req.body.userId }
+    }
+
+    Like.findOneAndDelete(variable)
+        .exec((err, result) => {
+            if (err) return res.status(400).json({ success: false, err })
+            res.status(200).json({ success: true })
+        })
+})
+
+router.post('/unDisLike', (req, res) => {
+
+    let variable = {}
+    if (req.body.videoId) {
+        variable = { videoId: req.body.videoId, userId: req.body.userId }
+    } else {
+        variable = { commentId: req.body.commentId , userId: req.body.userId }
+    }
+
+    Dislike.findOneAndDelete(variable)
+    .exec((err, result) => {
+        if (err) return res.status(400).json({ success: false, err })
+        res.status(200).json({ success: true })
+    })
+})
+
+router.post('/upDisLike', (req, res) => {
+
+    let variable = {}
+    if (req.body.videoId) {
+        variable = { videoId: req.body.videoId, userId: req.body.userId }
+    } else {
+        variable = { commentId: req.body.commentId , userId: req.body.userId }
+    }
+
+    // Dislike Collection에 클릭 정보를 넣어준다.
+    const disLike = new Dislike(variable)
+    disLike.save((err, dislikeResult) => {
+        if (err) return res.json({ success: false, err })
+
+        // 만약 Like이 이미 클릭이 되어 있다면, Like를 1 줄여준다
+        Like.findOneAndDelete(variable)
+            .exec((err, likeResult) => {
+                if (err) return res.status(400).json({ success: false, err })
+                res.status(200).json({ success: true })
+            })
+    })
+})
+
+module.exports = router
+```
