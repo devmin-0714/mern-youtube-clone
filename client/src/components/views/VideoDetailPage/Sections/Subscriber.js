@@ -20,8 +20,12 @@ function Subscriber(props) {
                 }
             })
 
-        // userFrom : 개발자도구 - Application - Local Storage - userId
-        let subscribedVariable = { userTo: props.userTo, userFrom: localStorage.getItem('userId')}
+        let subscribedVariable = { userTo: props.userTo, userFrom: props.userFrom }
+        // 잘못된 코드 : let subscribedVariable = { userTo: props.userTo, userFrom: localStorage.getItem('userId')}
+        // 다른 방법 : 
+        // const userTo = props.userTo
+        // const userFrom = props.userFrom
+        // let subscribedVariable = { userTo: userTo, userFrom: userFrom }
 
         axios.post('/api/subscribe/subscribed', subscribedVariable)
         .then(response => {
